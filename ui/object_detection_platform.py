@@ -117,6 +117,7 @@ class Thread_2(QThread):
     method_info_signal = pyqtSignal(str)
     info_signal = pyqtSignal(str)
     inference_time_signal = pyqtSignal(list)
+    mAP_signal = pyqtSignal(list)
     def __init__(self, baseline_method, new_method, dataset):
         super().__init__()
         self.baseline_method = baseline_method
@@ -289,6 +290,8 @@ class Thread_2(QThread):
                 metric = dataset.evaluate(outputs, **eval_kwargs)
                 print(metric)
                 metric_dict = dict(config=config, metric=metric)
+                mAP = round(metric['mAP'], 5) * 100
+                self.mAP_signal.emit([str(mAP), use_method])
 
 
     def single_gpu_test_ui_version(self,
@@ -434,11 +437,16 @@ class mywindow(QMainWindow,Ui_MainWindow):
             self.textBrowser_2.append(result)
 
         def print_inference_time(result):
-            print(result)
             if result[1] == 'baseline':
                 self.lineEdit_4.setText(result[0] + ' s')
             else:
                 self.lineEdit_6.setText(result[0] + ' s')
+
+        def print_mAP(result):
+            if result[1] == 'baseline':
+                self.lineEdit_3.setText(result[0] + ' %')
+            else:
+                self.lineEdit_5.setText(result[0] + ' %')
 
 
         try:
@@ -454,6 +462,7 @@ class mywindow(QMainWindow,Ui_MainWindow):
                 self.thread_2.method_info_signal.connect(print_method_info)
                 self.thread_2.info_signal.connect(print_progress_info)
                 self.thread_2.inference_time_signal.connect(print_inference_time)
+                self.thread_2.mAP_signal.connect(print_mAP)
                 self.thread_2.pushbuttun_signal.connect(set_btn)
                 self.thread_2.start()
 
@@ -468,6 +477,7 @@ class mywindow(QMainWindow,Ui_MainWindow):
             self.thread_2.method_info_signal.connect(print_method_info)
             self.thread_2.info_signal.connect(print_progress_info)
             self.thread_2.inference_time_signal.connect(print_inference_time)
+            self.thread_2.mAP_signal.connect(print_mAP)
             self.thread_2.pushbuttun_signal.connect(set_btn)
             self.thread_2.start()
 
