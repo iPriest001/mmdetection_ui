@@ -5,7 +5,7 @@ _base_ = [
 # model settings
 model = dict(
     neck=dict(
-        type='FPN_AAR1',
+        type='FPN_AAR',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
         start_level=1,
@@ -16,7 +16,7 @@ model = dict(
         num_classes=20)) #256
 
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=1,
     workers_per_gpu=2)
 
 # optimizer
