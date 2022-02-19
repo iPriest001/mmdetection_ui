@@ -18,34 +18,18 @@ class AdaptiveAngleConv(nn.Module):
         self.padding = padding
         self.angle_list = angle_list
         self.branches = len(angle_list)
-        if isinstance(kernel_size, int):
-            kernel_size = (kernel_size, kernel_size)
-        self.weight = torch.nn.Parameter(torch.randn((out_channel, in_channel) + kernel_size)).to('cuda')
-        # prepare rotate kernels which share parameters with each other
-        # self.weights = [self.weight]
-
-        # for i in range(1, self.branches):  # prepare rotate kernels which share parameters with each other
-        #    self.weights.append(self._rotate_kernel(self.weight.data, angle_list[i]))  # the process of rotate_kernel does not do grad computation, require_grad=False
-        self.bias = torch.nn.Parameter(torch.randn(out_channel)).to('cuda')
-
-        w1 = self._rotate_kernel(self.weight, self.angle_list[5])
-        w2 = self._rotate_kernel(self.weight, self.angle_list[6])
-        w3 = self._rotate_kernel(self.weight, self.angle_list[7])
+        self.baseline_conv = nn.Conv2d(in_channel, out_channel, (kernel_size, kernel_size), (stride, stride), (padding, padding))
 
     def forward(self, x):
-        """
-        for i in range(self.branches):
-            X.append(F.conv2d(x, self.weights[i], bias=self.bias, stride=self.stride, padding=self.padding))
-        """
-        y1 = F.conv2d(x, self.weight, bias=self.bias, stride=self.stride, padding=self.padding)
-        y2 = F.conv2d(x, self._rotate_kernel(self.weight, self.angle_list[1]), bias=self.bias, stride=self.stride, padding=self.padding)
-        y3 = F.conv2d(x, self._rotate_kernel(self.weight, self.angle_list[2]), bias=self.bias, stride=self.stride, padding=self.padding)
-        y4 = F.conv2d(x, self._rotate_kernel(self.weight, self.angle_list[3]), bias=self.bias, stride=self.stride, padding=self.padding)
-        y5 = F.conv2d(x, self._rotate_kernel(self.weight, self.angle_list[4]), bias=self.bias, stride=self.stride, padding=self.padding)
-        y6 = F.conv2d(x, self._rotate_kernel(self.weight, self.angle_list[5]), bias=self.bias, stride=self.stride, padding=self.padding)
-        y7 = F.conv2d(x, self._rotate_kernel(self.weight, self.angle_list[6]), bias=self.bias, stride=self.stride, padding=self.padding)
-        y8 = F.conv2d(x, self._rotate_kernel(self.weight, self.angle_list[7]), bias=self.bias, stride=self.stride, padding=self.padding)
-        return [y1, y2, y3, y4, y5, y6, y7, y8]
+        y = self.baseline_conv(x)
+        y_45 = F.conv2d(x, self._rotate_kernel(self.baseline_conv.weight, self.angle_list[1]), bias=self.baseline_conv.bias, stride=self.stride, padding=self.padding)
+        y_90 = F.conv2d(x, self._rotate_kernel(self.baseline_conv.weight, self.angle_list[2]), bias=self.baseline_conv.bias, stride=self.stride, padding=self.padding)
+        y_135 = F.conv2d(x, self._rotate_kernel(self.baseline_conv.weight, self.angle_list[3]), bias=self.baseline_conv.bias, stride=self.stride, padding=self.padding)
+        y_180 = F.conv2d(x, self._rotate_kernel(self.baseline_conv.weight, self.angle_list[4]), bias=self.baseline_conv.bias, stride=self.stride, padding=self.padding)
+        y_225 = F.conv2d(x, self._rotate_kernel(self.baseline_conv.weight, self.angle_list[5]), bias=self.baseline_conv.bias, stride=self.stride, padding=self.padding)
+        y_270 = F.conv2d(x, self._rotate_kernel(self.baseline_conv.weight, self.angle_list[6]), bias=self.baseline_conv.bias, stride=self.stride, padding=self.padding)
+        y_315 = F.conv2d(x, self._rotate_kernel(self.baseline_conv.weight, self.angle_list[7]), bias=self.baseline_conv.bias, stride=self.stride, padding=self.padding)
+        return [y, y_45, y_90, y_135, y_180, y_225, y_270, y_315]
 
     def _rotate_kernel(self, original_kernel, angle):  # only 3*3 kernel
         n = angle // 45
@@ -138,7 +122,7 @@ class SKConv(nn.Module):
         d = max(int(features / r), L)
         self.features = features
         self.bn_relus = nn.ModuleList()
-        for i in range(M):
+        for i in range(M-1):  # 45, 90, 135, 180
             self.bn_relus.append(nn.Sequential(
                 nn.BatchNorm2d(features),
                 nn.ReLU(inplace=False)
@@ -146,17 +130,17 @@ class SKConv(nn.Module):
         # self.gap = nn.AvgPool2d(int(WH/stride))
         self.fc = nn.Linear(features, d)
         self.fcs = nn.ModuleList([])
-        for i in range(M):
+        for i in range(M-1):
             self.fcs.append(
                 nn.Linear(d, features)
             )
         self.softmax = nn.Softmax(dim=1)
-        self.branch = M
+        self.branch = M-1
 
     def forward(self, X):
         feas = []
         for i in range(self.branch):
-            feas.append(self.bn_relus[i](X[i]).unsqueeze_(dim=1))
+            feas.append(self.bn_relus[i](X[i+1]).unsqueeze_(dim=1))
         feas = torch.cat(feas, dim=1)
         fea_U = torch.sum(feas, dim=1)
         fea_s = fea_U.mean(-1).mean(-1)
@@ -170,6 +154,7 @@ class SKConv(nn.Module):
         attention_vectors = self.softmax(attention_vectors)
         attention_vectors = attention_vectors.unsqueeze(-1).unsqueeze(-1)
         fea_v = (feas * attention_vectors).sum(dim=1)
+        fea_v += X[0]  # residual structure
         return fea_v
 
 
@@ -248,7 +233,7 @@ class FPN_AAR1(nn.Module):
                 1,
                 angle_list=[0, 45, 90, 135, 180, 225, 270, 315]
             )
-            fusion = SKConv(2, 8, 2, 32)
+            fusion = SKConv(256, 8, 2, 32)
 
             self.lateral_convs.append(l_conv)
             self.fpn_rotate_convs.append(fpn_rotate_conv)
@@ -263,18 +248,17 @@ class FPN_AAR1(nn.Module):
                 else:
                     in_channels = out_channels
 
-                extra_fpn_rotate_conv = AdaptiveAngleConv(
-                in_channels,
-                out_channels,
-                3,
-                2,
-                1,
-                angle_list=[0, 45, 90, 135, 180, 225, 270, 315]
-            )
-                fusion = SKConv(2, 8, 2, 32)
-
-                self.fpn_rotate_convs.append(extra_fpn_rotate_conv)
-                self.fusions.append(fusion)
+                extra_fpn_conv = ConvModule(
+                    in_channels,
+                    out_channels,
+                    3,
+                    stride=2,
+                    padding=1,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=act_cfg,
+                    inplace=False)
+                self.fpn_rotate_convs.append(extra_fpn_conv)
 
 
     # default init_weights for conv(msra) and norm in ConvModule
@@ -342,12 +326,10 @@ class FPN_AAR1(nn.Module):
                     extra_source = outs[-1]
                 else:
                     raise NotImplementedError
-                outs.append(self.fusions[used_backbone_levels](self.fpn_rotate_convs[used_backbone_levels](extra_source)))
+                outs.append(self.fpn_rotate_convs[used_backbone_levels](extra_source))
                 for i in range(used_backbone_levels + 1, self.num_outs):
                     if self.relu_before_extra_convs:
-                        outs.append(self.fusions[i](self.fpn_rotate_convs[i](F.relu(outs[-1]))))
+                        outs.append(self.fpn_rotate_convs[i](F.relu(outs[-1])))
                     else:
-                        outs.append(self.fusions[i](self.fpn_rotate_convs[i](outs[-1])))
+                        outs.append(self.fpn_rotate_convs[i](outs[-1]))
         return tuple(outs)
-
-
