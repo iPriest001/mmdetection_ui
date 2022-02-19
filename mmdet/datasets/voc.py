@@ -31,7 +31,8 @@ class VOCDataset(XMLDataset):
                  logger=None,
                  proposal_nums=(100, 300, 1000),
                  iou_thr=0.5,
-                 scale_ranges=None):
+                 scale_ranges=None,
+                 ui_show=False):  # for ui show
         """Evaluate in VOC protocol.
 
         Args:
@@ -75,14 +76,25 @@ class VOCDataset(XMLDataset):
                 # we should use the legacy coordinate system in mmdet 1.x,
                 # which means w, h should be computed as 'x2 - x1 + 1` and
                 # `y2 - y1 + 1`
-                mean_ap, _ = eval_map(
-                    results,
-                    annotations,
-                    scale_ranges=None,
-                    iou_thr=iou_thr,
-                    dataset=ds_name,
-                    logger=logger,
-                    use_legacy_coordinate=True)
+                if ui_show:
+                    mean_ap, eval_result, result_table = eval_map(
+                        results,
+                        annotations,
+                        scale_ranges=None,
+                        iou_thr=iou_thr,
+                        dataset=ds_name,
+                        logger=logger,
+                        use_legacy_coordinate=True,
+                        ui_show=ui_show)
+                else:
+                    mean_ap, _ = eval_map(
+                        results,
+                        annotations,
+                        scale_ranges=None,
+                        iou_thr=iou_thr,
+                        dataset=ds_name,
+                        logger=logger,
+                        use_legacy_coordinate=True)
                 mean_aps.append(mean_ap)
                 eval_results[f'AP{int(iou_thr * 100):02d}'] = round(mean_ap, 3)
             eval_results['mAP'] = sum(mean_aps) / len(mean_aps)
@@ -102,4 +114,8 @@ class VOCDataset(XMLDataset):
                 ar = recalls.mean(axis=1)
                 for i, num in enumerate(proposal_nums):
                     eval_results[f'AR@{num}'] = ar[i]
-        return eval_results
+
+        if ui_show:
+            return eval_results, result_table
+        else:
+            return eval_results

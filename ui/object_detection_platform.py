@@ -118,6 +118,7 @@ class Thread_2(QThread):
     info_signal = pyqtSignal(str)
     inference_time_signal = pyqtSignal(list)
     mAP_signal = pyqtSignal(list)
+    result_table = pyqtSignal(list)
     def __init__(self, baseline_method, new_method, dataset):
         super().__init__()
         self.baseline_method = baseline_method
@@ -287,11 +288,17 @@ class Thread_2(QThread):
                 ]:
                     eval_kwargs.pop(key, None)
                 #eval_kwargs.update(dict(metric=args.eval, **kwargs))
-                metric = dataset.evaluate(outputs, **eval_kwargs)
+                if self.dataset=='COCO':
+                    metric = dataset.evaluate(outputs, **eval_kwargs)
+                    mAP = round(metric['bbox_mAP'], 5) * 100
+                else:
+                    metric, result_table = dataset.evaluate(outputs, ui_show=True, **eval_kwargs)
+                    self.result_table.emit([result_table.table])
+                    mAP = round(metric['mAP'], 5) * 100
                 print(metric)
                 metric_dict = dict(config=config, metric=metric)
-                mAP = round(metric['mAP'], 5) * 100
                 self.mAP_signal.emit([str(mAP), use_method])
+
 
 
     def single_gpu_test_ui_version(self,
@@ -448,6 +455,10 @@ class mywindow(QMainWindow,Ui_MainWindow):
             else:
                 self.lineEdit_5.setText(result[0] + ' %')
 
+        def print_table(result):
+            table = result[0]
+            self.textBrowser_2.append(table)
+
 
         try:
             if self.thread_2 != None:
@@ -463,6 +474,7 @@ class mywindow(QMainWindow,Ui_MainWindow):
                 self.thread_2.info_signal.connect(print_progress_info)
                 self.thread_2.inference_time_signal.connect(print_inference_time)
                 self.thread_2.mAP_signal.connect(print_mAP)
+                self.thread_2.result_table.connect(print_table)
                 self.thread_2.pushbuttun_signal.connect(set_btn)
                 self.thread_2.start()
 
@@ -478,6 +490,7 @@ class mywindow(QMainWindow,Ui_MainWindow):
             self.thread_2.info_signal.connect(print_progress_info)
             self.thread_2.inference_time_signal.connect(print_inference_time)
             self.thread_2.mAP_signal.connect(print_mAP)
+            self.thread_2.result_table.connect(print_table)
             self.thread_2.pushbuttun_signal.connect(set_btn)
             self.thread_2.start()
 

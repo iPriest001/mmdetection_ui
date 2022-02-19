@@ -369,7 +369,8 @@ class CocoDataset(CustomDataset):
                  classwise=False,
                  proposal_nums=(100, 300, 1000),
                  iou_thrs=None,
-                 metric_items=None):
+                 metric_items=None,
+                 ui_show=False):  # ui
         """Evaluation in COCO protocol.
 
         Args:

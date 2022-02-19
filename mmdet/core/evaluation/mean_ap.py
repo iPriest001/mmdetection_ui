@@ -302,7 +302,8 @@ def eval_map(det_results,
              logger=None,
              tpfp_fn=None,
              nproc=4,
-             use_legacy_coordinate=False):
+             use_legacy_coordinate=False,
+             ui_show=False):  # for ui show
     """Evaluate mAP of a dataset.
 
     Args:
@@ -434,18 +435,23 @@ def eval_map(det_results,
             if cls_result['num_gts'] > 0:
                 aps.append(cls_result['ap'])
         mean_ap = np.array(aps).mean().item() if aps else 0.0
+    if ui_show:
+        result_table = print_map_summary(
+            mean_ap, eval_results, dataset, area_ranges, logger=logger, ui_show=ui_show) # ui
+        return mean_ap, eval_results, result_table
+    else:
+        print_map_summary(
+            mean_ap, eval_results, dataset, area_ranges, logger=logger)
+        return mean_ap, eval_results
 
-    print_map_summary(
-        mean_ap, eval_results, dataset, area_ranges, logger=logger)
-
-    return mean_ap, eval_results
 
 
 def print_map_summary(mean_ap,
                       results,
                       dataset=None,
                       scale_ranges=None,
-                      logger=None):
+                      logger=None,
+                      ui_show=False): # for ui show
     """Print mAP and results of each class.
 
     A table will be printed to show the gts/dets/recall/AP of each class and
@@ -507,3 +513,7 @@ def print_map_summary(mean_ap,
         table = AsciiTable(table_data)
         table.inner_footing_row_border = True
         print_log('\n' + table.table, logger=logger)
+
+        # ui
+        if ui_show:
+            return table
