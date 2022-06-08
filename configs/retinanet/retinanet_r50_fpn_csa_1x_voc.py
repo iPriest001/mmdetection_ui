@@ -5,7 +5,7 @@ _base_ = [
 # model settings
 model = dict(
     neck=dict(
-        type='FPN_CSA',
+        type='FPN_CSA2',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
         start_level=1,

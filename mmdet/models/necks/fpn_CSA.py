@@ -3,18 +3,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import ConvModule, xavier_init
-from mmcv.runner import auto_fp16
+from mmcv.runner import auto_fp16, BaseModule
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
 from ..builder import NECKS
 
 
-class GroupAttention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., ws=1, sr_ratio=1.0):
+class GroupAttention(BaseModule):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., ws=1, init_cfg=None):
         """
         ws 1 for stand attention
         """
-        super(GroupAttention, self).__init__()
+        super(GroupAttention, self).__init__(init_cfg)
         assert dim % num_heads == 0, f"dim {dim} should be divided by num_heads {num_heads}."
 
         self.dim = dim
@@ -55,9 +55,9 @@ class GroupAttention(nn.Module):
         return x
 
 
-class Attention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., sr_ratio=1):
-        super().__init__()
+class Attention(BaseModule):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., sr_ratio=1, init_cfg=None):
+        super().__init__(init_cfg)
         assert dim % num_heads == 0, f"dim {dim} should be divided by num_heads {num_heads}."
 
         self.dim = dim
@@ -103,9 +103,9 @@ class Attention(nn.Module):
         return out
 
 
-class Cross_Attention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., sr_ratio=1):
-        super().__init__()
+class Cross_Attention(BaseModule):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., sr_ratio=1, init_cfg=None):
+        super().__init__(init_cfg)
         assert dim % num_heads == 0, f"dim {dim} should be divided by num_heads {num_heads}."
 
         self.dim = dim
@@ -152,9 +152,9 @@ class Cross_Attention(nn.Module):
         return out
 
 
-class self_attn(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, drop_path=0., attn_drop=0., proj_drop=0., ws=1, sr_ratio=1.0):
-        super(self_attn, self).__init__()
+class self_attn(BaseModule):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, drop_path=0., attn_drop=0., proj_drop=0., ws=1, sr_ratio=1.0, init_cfg=None):
+        super(self_attn, self).__init__(init_cfg)
 
         self.dim = dim
         self.num_heads = num_heads
@@ -182,9 +182,9 @@ class self_attn(nn.Module):
         return x1
 
 
-class high2low_attn(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., ws=1, sr_ratio=1.0):
-        super(high2low_attn, self).__init__()
+class high2low_attn(BaseModule):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., ws=1, sr_ratio=1.0, init_cfg=None):
+        super(high2low_attn, self).__init__(init_cfg)
 
         self.dim = dim
         self.num_heads = num_heads
@@ -212,21 +212,18 @@ class high2low_attn(nn.Module):
         x_low1 = x_low1 + self.group_attn(self.layernorm1(x_low1), H, W)
         x_low1 = x_low1 + self.global_attn(self.layernorm2(x_low1), H, W, self.layernorm3(x_high1), H1, W1)
         x_low1 = x_low1.permute(0, 2, 1).reshape(B, C, H, W).contiguous()  # (B,C,H,W)
-        x_high1 = x_high1.permute(0, 2, 1).reshape(B1, C1, H1, W1).contiguous()  # (B,C,H,W)
+        #x_high1 = x_high1.permute(0, 2, 1).reshape(B1, C1, H1, W1).contiguous()  # (B,C,H,W)
 
         return x_low1
 
 
-class low2high_attn(nn.Module):
-    def __init__(self, channels_high, channels_low):
-        super(low2high_attn, self).__init__()
-        self.conv_reduction = nn.Conv2d(channels_low, channels_high, kernel_size=1, padding=0, bias=False)
-        self.bn_reduction = nn.BatchNorm2d(channels_high)
-
-
+class low2high_attn(BaseModule):
+    def __init__(self, channels_high, channels_low, ratio, init_cfg=None):
+        super(low2high_attn, self).__init__(init_cfg)
         self.conv1x1 = nn.Conv2d(channels_low, channels_high, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn_reduction = nn.BatchNorm2d(channels_high)
         self.relu = nn.ReLU(inplace=True)
-        self.coorattention = cross_scale_CoordAtt(channels_low, channels_low)
+        self.coorattention = cross_scale_CoordAtt(channels_low, channels_low, ratio)
 
     def forward(self, x_low, x_high):
         x_att = self.coorattention(x_low, x_high)
@@ -235,36 +232,39 @@ class low2high_attn(nn.Module):
 
 
 # coordAttention !!!
-class h_sigmoid(nn.Module):
-    def __init__(self, inplace=True):
-        super(h_sigmoid, self).__init__()
+class h_sigmoid(BaseModule):
+    def __init__(self, inplace=True, init_cfg=None):
+        super(h_sigmoid, self).__init__(init_cfg)
         self.relu = nn.ReLU6(inplace=inplace)
 
     def forward(self, x):
         return self.relu(x + 3) / 6
 
 
-class h_swish(nn.Module):
-    def __init__(self, inplace=True):
-        super(h_swish, self).__init__()
+class h_swish(BaseModule):
+    def __init__(self, inplace=True, init_cfg=None):
+        super(h_swish, self).__init__(init_cfg)
         self.sigmoid = h_sigmoid(inplace=inplace)
 
     def forward(self, x):
         return x * self.sigmoid(x)
 
 
-class cross_scale_CoordAtt(nn.Module):
-    def __init__(self, inp, oup, reduction=32):
-        super(cross_scale_CoordAtt, self).__init__()
+class cross_scale_CoordAtt(BaseModule):
+    def __init__(self, inp, oup, ratio, reduction=32, init_cfg=None):
+        super(cross_scale_CoordAtt, self).__init__(init_cfg)
         self.pool_h = nn.AdaptiveAvgPool2d((None, 1))
         self.pool_w = nn.AdaptiveAvgPool2d((1, None))
+        self.ratio = ratio
 
         mip = max(8, inp // reduction)
-
-        self.conv1_s2 = nn.Conv2d(inp, mip, kernel_size=3, stride=2, padding=1)  # change k=1,s=1
-        self.conv1_s4 = nn.Sequential(nn.Conv2d(inp, mip, kernel_size=3, stride=2, padding=1, bias=False),
+        if self.ratio == 2:
+            self.conv1 = nn.Conv2d(inp, mip, kernel_size=3, stride=2, padding=1)  # change k=1,s=1
+        elif self.ratio == 4:
+            self.conv1 = nn.Sequential(nn.Conv2d(inp, mip, kernel_size=3, stride=2, padding=1, bias=False),
                                       nn.Conv2d(mip, mip, kernel_size=3, stride=2, padding=1, bias=False))
-        self.conv1_s8 = nn.Sequential(nn.Conv2d(inp, mip, kernel_size=3, stride=2, padding=1, bias=False),
+        else:
+            self.conv1 = nn.Sequential(nn.Conv2d(inp, mip, kernel_size=3, stride=2, padding=1, bias=False),
                                       nn.Conv2d(mip, mip, kernel_size=3, stride=2, padding=1, bias=False),
                                       nn.Conv2d(mip, mip, kernel_size=3, stride=2, padding=1, bias=False))
         self.bn1 = nn.BatchNorm2d(mip)
@@ -275,20 +275,14 @@ class cross_scale_CoordAtt(nn.Module):
 
     def forward(self, x_low, x_high):
         identity = x_high
-        n, c, h, w = x_low.size()
+        #n, c, h, w = x_low.size()
         n1, c1, h1, w1 = x_high.size()
-        stride = h // h1
 
         x_h = self.pool_h(x_low)
         x_w = self.pool_w(x_low).permute(0, 1, 3, 2)
 
         y = torch.cat([x_h, x_w], dim=2)
-        if stride == 2:
-            y = self.conv1_s2(y)
-        elif stride == 4:
-            y = self.conv1_s4(y)
-        else:
-            y = self.conv1_s8(y)
+        y = self.conv1(y)
         y = self.bn1(y)
         y = self.act(y)
 
@@ -328,9 +322,9 @@ def add_conv(in_ch, out_ch, ksize, stride, leaky=True):
 
 
 # adaptive scale feature fusion
-class ASFF(nn.Module):
-    def __init__(self, rfb=False, vis=False):
-        super(ASFF, self).__init__()
+class ASFF(BaseModule):
+    def __init__(self, rfb=False, vis=False, init_cfg=None):
+        super(ASFF, self).__init__(init_cfg)
         self.dim = 256
         self.inter_dim = self.dim
 
@@ -346,11 +340,10 @@ class ASFF(nn.Module):
 
 
     def forward(self, x_level_0, x_level_1, x_level_2):
-
         level_0_weight_v = self.weight_level_0(x_level_0)
         level_1_weight_v = self.weight_level_1(x_level_1)
         level_2_weight_v = self.weight_level_2(x_level_2)
-        levels_weight_v = torch.cat((level_0_weight_v, level_1_weight_v, level_2_weight_v),1)
+        levels_weight_v = torch.cat((level_0_weight_v, level_1_weight_v, level_2_weight_v) ,1)
         levels_weight = self.weight_levels(levels_weight_v)
         levels_weight = F.softmax(levels_weight, dim=1)
 
@@ -366,7 +359,7 @@ class ASFF(nn.Module):
 
 
 @NECKS.register_module()
-class FPN_CSA(nn.Module):
+class FPN_CSA(BaseModule):
     def __init__(self,
                  in_channels,
                  out_channels,
@@ -377,8 +370,9 @@ class FPN_CSA(nn.Module):
                  relu_before_extra_convs=False,
                  num_outs=5,  # in = out
                  with_norm=False,
-                 upsample_method='bilinear'):
-        super(FPN_CSA, self).__init__()
+                 upsample_method='bilinear',
+                 init_cfg=None):
+        super(FPN_CSA, self).__init__(init_cfg)
         assert isinstance(in_channels, list)
         self.in_channels = in_channels
         self.feature_dim = out_channels
@@ -388,6 +382,7 @@ class FPN_CSA(nn.Module):
         self.end_level = end_level
         self.add_extra_convs = add_extra_convs
         self.extra_convs_on_inputs = extra_convs_on_inputs
+        self.relu_before_extra_convs = relu_before_extra_convs
         assert upsample_method in ['nearest', 'bilinear']
 
         if end_level == -1:
@@ -423,37 +418,28 @@ class FPN_CSA(nn.Module):
                 *[nn.Conv2d(in_channels[2], out_channels, 1, bias=False), nn.BatchNorm2d(out_channels)])
             self.fpna_p3_1x1 = nn.Sequential(
                 *[nn.Conv2d(in_channels[1], out_channels, 1, bias=False), nn.BatchNorm2d(out_channels)])
-#            self.fpna_p2_1x1 = nn.Sequential(*[nn.Conv2d(in_channels[0], out_channels, 1, bias=False), nn.BatchNorm2d(out_channels)])
+            # self.fpna_p2_1x1 = nn.Sequential(*[nn.Conv2d(in_channels[0], out_channels, 1, bias=False), nn.BatchNorm2d(out_channels)])
 
         else:
             self.fpna_p5_1x1 = nn.Conv2d(in_channels[3], out_channels, 1)
             self.fpna_p4_1x1 = nn.Conv2d(in_channels[2], out_channels, 1)
             self.fpna_p3_1x1 = nn.Conv2d(in_channels[1], out_channels, 1)
-#            self.fpna_p2_1x1 = nn.Conv2d(in_channels[0], out_channels, 1)
 
         # add attention
         # self_attention
-        # self.self_p2 = self_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=8)
         self.self_p3 = self_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=8)
         self.self_p4 = self_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=4)
         self.self_p5 = self_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=2)
         # high_to_low attention
-        # self.h2l_p3_p2 = high2low_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=4)
-        # self.h2l_p4_p2 = high2low_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=2)
-        # self.h2l_p5_p2 = high2low_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=1)
         self.h2l_p4_p3 = high2low_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=4)
         self.h2l_p5_p3 = high2low_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=2)
         self.h2l_p5_p4 = high2low_attn(dim=out_channels, num_heads=8, ws=7, sr_ratio=2)
         # low_to_high attention
-#        self.l2h_p2_p3 = low2high_attn(out_channels, out_channels)
-#        self.l2h_p2_p4 = low2high_attn(out_channels, out_channels)
-        self.l2h_p3_p4 = low2high_attn(out_channels, out_channels)
-#        self.l2h_p2_p5 = low2high_attn(out_channels, out_channels)
-        self.l2h_p3_p5 = low2high_attn(out_channels, out_channels)
-        self.l2h_p4_p5 = low2high_attn(out_channels, out_channels)
+        self.l2h_p3_p4 = low2high_attn(out_channels, out_channels, 2)
+        self.l2h_p3_p5 = low2high_attn(out_channels, out_channels, 4)
+        self.l2h_p4_p5 = low2high_attn(out_channels, out_channels, 2)
 
         # adaptive feature fusion
-#        self.p2_fusion = ASFF(rfb=False, vis=False)
         self.p3_fusion = ASFF(rfb=False, vis=False)
         self.p4_fusion = ASFF(rfb=False, vis=False)
         self.p5_fusion = ASFF(rfb=False, vis=False)
@@ -480,16 +466,14 @@ class FPN_CSA(nn.Module):
                 m.weight.data.fill_(1.0)
                 m.bias.data.zero_()
 
+
     @auto_fp16()
     def forward(self, inputs):
         assert len(inputs) == len(self.in_channels)
         p5 = self.fpna_p5_1x1(inputs[self.end_level])
         p4 = self.fpna_p4_1x1(inputs[self.start_level + 1])
         p3 = self.fpna_p3_1x1(inputs[self.start_level])
-#        p2 = self.fpna_p2_1x1(inputs[self.start_level])
 
-#        fpna_p2_out = self.p2_fusion(self.self_p2(p2), self.h2l_p3_p2(p2, p3),
-#                                     self.h2l_p4_p2(p2, p4), self.h2l_p5_p2(p2, p5))
         fpna_p3_out = self.p3_fusion(self.self_p3(p3), self.h2l_p4_p3(p3, p4), self.h2l_p5_p3(p3, p5))
         fpna_p4_out = self.p4_fusion(self.self_p4(p4), self.h2l_p5_p4(p4, p5), self.l2h_p3_p4(p3, p4))
         fpna_p5_out = self.p5_fusion(self.self_p5(p5), self.l2h_p3_p5(p3, p5), self.l2h_p4_p5(p4, p5))
@@ -502,7 +486,7 @@ class FPN_CSA(nn.Module):
             fpna_p6_out = self.fpna_p6(fpna_p5_out)
             fpna_p7_out = self.fpna_p7(fpna_p6_out)
 
-        fpn_csa_outs = [fpna_p3_out, fpna_p4_out, fpna_p5_out, fpna_p6_out, fpna_p7_out]
+        fpn_csa_out = [fpna_p3_out, fpna_p4_out, fpna_p5_out, fpna_p6_out, fpna_p7_out]
 
-        return tuple(fpn_csa_outs)
+        return tuple(fpn_csa_out)
 

@@ -175,6 +175,7 @@ class TwoStageDetector(BaseDetector):
 
         assert self.with_bbox, 'Bbox head must be implemented.'
         x = self.extract_feat(img)
+        #return (x,)
         if proposals is None:
             proposal_list = self.rpn_head.simple_test_rpn(x, img_metas)
         else:
@@ -182,6 +183,8 @@ class TwoStageDetector(BaseDetector):
 
         return self.roi_head.simple_test(
             x, proposal_list, img_metas, rescale=rescale)
+
+
 
     def aug_test(self, imgs, img_metas, rescale=False):
         """Test with augmentations.

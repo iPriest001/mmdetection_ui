@@ -4,7 +4,8 @@ import warnings
 import torch
 
 from mmdet.core import bbox2result
-from ..builder import DETECTORS, build_backbone, build_head, build_neck
+from ..builder import DETECTORS, build_backbone, build_head, build_neck, build_roi_extractor
+from mmdet.core.bbox import build_assigner, build_sampler, bbox2roi
 from .base import BaseDetector
 
 
@@ -38,13 +39,19 @@ class SingleStageDetector(BaseDetector):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
+
     def extract_feat(self, img):
         """Directly extract features from the backbone+neck."""
         x = self.backbone(img)
         if self.with_neck:
             x = self.neck(x)
-        return x
-
+            return x
+        """
+        x_backbone = self.backbone(img)
+        if self.with_neck:
+            x_neck = self.neck(x_backbone)
+            return x_backbone, x_neck
+        """
     def forward_dummy(self, img):
         """Used for computing network flops.
 
@@ -99,6 +106,8 @@ class SingleStageDetector(BaseDetector):
                 corresponds to each class.
         """
         feat = self.extract_feat(img)
+        # x_backbone, x_neck = self.extract_feat(img)
+        #return (feat,)
         results_list = self.bbox_head.simple_test(
             feat, img_metas, rescale=rescale)
         bbox_results = [
@@ -106,6 +115,7 @@ class SingleStageDetector(BaseDetector):
             for det_bboxes, det_labels in results_list
         ]
         return bbox_results
+
 
     def aug_test(self, imgs, img_metas, rescale=False):
         """Test function with test time augmentation.

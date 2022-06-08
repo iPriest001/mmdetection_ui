@@ -4,8 +4,6 @@ from argparse import ArgumentParser
 
 from mmdet.apis import (async_inference_detector, inference_detector,
                         init_detector, show_result_pyplot)
-
-
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('img', help='Image file')
@@ -14,7 +12,7 @@ def parse_args():
     parser.add_argument(
         '--device', default='cuda:0', help='Device used for inference')
     parser.add_argument(
-        '--score-thr', type=float, default=0.3, help='bbox score threshold')
+        '--score-thr', type=float, default=0.5, help='bbox score threshold')
     parser.add_argument(
         '--async-test',
         action='store_true',

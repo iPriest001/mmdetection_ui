@@ -17,7 +17,8 @@ class AdaptiveAngleConv(nn.Module):  # deformable convolution version
         self.padding = padding
         self.stride = stride
         self.zero_padding = nn.ZeroPad2d(padding)
-        self.baseline_conv = nn.Conv2d(inc, outc, kernel_size=kernel_size, stride=kernel_size, bias=bias)
+        # self.baseline_conv = nn.Conv2d(inc, outc, kernel_size=kernel_size, stride=kernel_size, bias=bias)
+        self.baseline_conv = nn.Conv2d(inc, outc, kernel_size=kernel_size, stride=1, bias=bias)
         self.angle_list = angle_list
         self.branches = len(angle_list)
 
@@ -32,14 +33,14 @@ class AdaptiveAngleConv(nn.Module):  # deformable convolution version
         x_offset_180 = self._get_x_offset(x, N, h, w, self.angle_list[4])
 
         y = self.baseline_conv(x_offset_0)
-        y_45 = F.conv2d(x_offset_45, self.baseline_conv.weight, bias=self.baseline_conv.bias, stride=self.stride,
-                        padding=self.padding)
-        y_90 = F.conv2d(x_offset_90, self.baseline_conv.weight, bias=self.baseline_conv.bias, stride=self.stride,
-                        padding=self.padding)
-        y_135 = F.conv2d(x_offset_135, self.baseline_conv.weight, bias=self.baseline_conv.bias, stride=self.stride,
-                         padding=self.padding)
-        y_180 = F.conv2d(x_offset_180, self.baseline_conv.weight, bias=self.baseline_conv.bias, stride=self.stride,
-                         padding=self.padding)
+        y_45 = F.conv2d(x_offset_45, self.baseline_conv.weight, bias=self.baseline_conv.bias, stride=self.baseline_conv.stride,
+                        padding=self.baseline_conv.padding)
+        y_90 = F.conv2d(x_offset_90, self.baseline_conv.weight, bias=self.baseline_conv.bias, stride=self.baseline_conv.stride,
+                        padding=self.baseline_conv.padding)
+        y_135 = F.conv2d(x_offset_135, self.baseline_conv.weight, bias=self.baseline_conv.bias, stride=self.baseline_conv.stride,
+                         padding=self.baseline_conv.padding)
+        y_180 = F.conv2d(x_offset_180, self.baseline_conv.weight, bias=self.baseline_conv.bias, stride=self.baseline_conv.stride,
+                         padding=self.baseline_conv.padding)
 
         return [y, y_45, y_90, y_135, y_180]
 
@@ -84,9 +85,10 @@ class AdaptiveAngleConv(nn.Module):  # deformable convolution version
 
         # (b, c, h, w, N)
         x_offset = g_lt.unsqueeze(dim=1) * x_q_lt + \
-                   g_rb.unsqueeze(dim=1) * x_q_rb + \
-                   g_lb.unsqueeze(dim=1) * x_q_lb + \
-                   g_rt.unsqueeze(dim=1) * x_q_rt
+                   g_rb.unsqueeze(dim=1) * x_q_rb
+
+        x_offset += g_lb.unsqueeze(dim=1) * x_q_lb
+        x_offset += g_rt.unsqueeze(dim=1) * x_q_rt
 
         x_offset = self._reshape_x_offset(x_offset, ks)
 
@@ -118,6 +120,8 @@ class AdaptiveAngleConv(nn.Module):  # deformable convolution version
         offset_y = torch.tensor(offset_y)
         offset = torch.cat([torch.flatten(offset_x), torch.flatten(offset_y)], 0)
         offset = offset.view(1, 2 * N, 1, 1).type(dtype)  # offset.view(1, 2 * N, 1, 1)
+
+        offset = offset.repeat(2, 1, 1, 1)
 
         return offset
 

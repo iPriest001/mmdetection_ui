@@ -40,6 +40,7 @@ class Thread_1(QThread):  # thread 1 : detect single image
     def detect_single_image(self):
         root_path = '/home/mst10512/mmdetection_219/'
         img = self.img  # current image
+        show_score_thr = 0.5
         if self.methods == "Faster R-CNN + FPN":
             if self.dataset == "COCO":  # faster_rcnn_fpn_coco
                 config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_1x_coco.py'
@@ -49,9 +50,6 @@ class Thread_1(QThread):  # thread 1 : detect single image
                 config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_1x_voc.py'
                 checkpoint = root_path + 'checkpoints/faster_rcnn/voc/faster_rcnn_r50_fpn_voc.pth'
 
-            if self.dataset == "DIOR":  # faster_rcnn_fpn_dior
-                config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_1x_dior.py'
-                checkpoint = root_path + 'checkpoints/faster_rcnn/dior/faster_rcnn_r50_fpn_dior.pth'
 
         if self.methods == "Faster R-CNN + CSA-FPN":
             if self.dataset == "COCO":  # faster_rcnn_fpn_csa_coco:
@@ -62,9 +60,28 @@ class Thread_1(QThread):  # thread 1 : detect single image
                 config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_csa_1x_voc.py'
                 checkpoint = root_path + 'checkpoints/faster_rcnn/voc/faster_rcnn_r50_fpn_csa_voc.pth'
 
-            if self.dataset == "DIOR":  # faster_rcnn_fpn_csa_dior
-                config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_csa_1x_dior.py'
-                checkpoint = root_path + 'checkpoints/faster_rcnn/dior/faster_rcnn_r50_fpn_csa_dior.pth'
+
+        if self.methods == "Faster R-CNN + AAR-FPN":
+            if self.dataset == "COCO":  # faster_rcnn_fpn_aar_coco:
+                config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_aar_1x_coco.py'
+                checkpoint = root_path + 'checkpoints/faster_rcnn/coco/faster_rcnn_r50_fpn_aar2_coco.pth'
+
+            if self.dataset == "PASCAL VOC":  # faster_rcnn_fpn_aar_voc
+                config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_aar_1x_voc.py'
+                checkpoint = root_path + 'checkpoints/faster_rcnn/voc/faster_rcnn_r50_fpn_aar2_voc.pth'
+
+
+        if self.methods == "Faster R-CNN + CSA-FPN + AAR-FPN":
+            if self.dataset == "COCO":  # faster_rcnn_csa_fpn_aar_coco:
+                config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_csa_fpn_aar_1x_coco.py'
+                checkpoint = root_path + 'checkpoints/faster_rcnn/coco/faster_rcnn_r50_csa_fpn_aar_coco.pth'
+                show_score_thr = 0.6
+
+            if self.dataset == "PASCAL VOC":  # faster_rcnn_csa_fpn_aar_voc
+                config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_csa_fpn_aar_1x_voc.py'
+                checkpoint = root_path + 'checkpoints/faster_rcnn/voc/faster_rcnn_r50_csa_fpn_aar_voc.pth'
+                show_score_thr = 0.6
+
 
         if self.methods == "RetinaNet + FPN":
             if self.dataset == "COCO":  # retinanet_fpn_coco:
@@ -75,9 +92,6 @@ class Thread_1(QThread):  # thread 1 : detect single image
                 config = root_path + 'configs/retinanet/retinanet_r50_fpn_1x_voc.py'
                 checkpoint = root_path + 'checkpoints/retinanet/voc/retinanet_r50_fpn_voc.pth'
 
-            if self.dataset == "DIOR":  # retinanet_fpn_dior
-                config = root_path + 'configs/retinanet/retinanet_r50_fpn_1x_dior.py'
-                checkpoint = root_path + 'checkpoints/retinanet/dior/retinanet_r50_fpn_dior.pth'
 
         if self.methods == "RetinaNet + CSA-FPN":
             if self.dataset == "COCO":  # retinanet_fpn_csa_coco:
@@ -88,14 +102,21 @@ class Thread_1(QThread):  # thread 1 : detect single image
                 config = root_path + 'configs/retinanet/retinanet_r50_fpn_csa_1x_voc.py'
                 checkpoint = root_path + 'checkpoints/retinanet/voc/retinanet_r50_fpn_csa_voc.pth'
 
-            if self.dataset == "DIOR":  # retinanet_fpn_csa_dior
-                config = root_path + 'configs/retinanet/retinanet_r50_fpn_csa_1x_dior.py'
-                checkpoint = root_path + 'checkpoints/retinanet/dior/retinanet_r50_fpn_csa_dior.pth'
 
-        self.object_detect_api(config, checkpoint, img)  # detect image
+        if self.methods == "RetinaNet + AAR-FPN":
+            if self.dataset == "COCO":  # retinanet_fpn_csa_coco:
+                config = root_path + 'configs/retinanet/retinanet_r50_fpn_aar_1x_coco.py'
+                checkpoint = root_path + 'checkpoints/retinanet/coco/retinanet_r50_fpn_aar2_coco.pth'
+
+            if self.dataset == "PASCAL VOC":  # retinanet_fpn_csa_voc
+                config = root_path + 'configs/retinanet/retinanet_r50_fpn_aar_1x_voc.py'
+                checkpoint = root_path + 'checkpoints/retinanet/voc/retinanet_r50_fpn_aar2_voc.pth'
 
 
-    def object_detect_api(self, config, checkpoint, img):  # config , checkpoint and img are both path (string)
+        self.object_detect_api(config, checkpoint, img, show_score_thr)  # detect image
+
+
+    def object_detect_api(self, config, checkpoint, img, score_thr=0.5):  # config , checkpoint and img are both path (string)
         # build the model from a config file and a checkpoint file
         model = init_detector(config, checkpoint, device='cuda:0')
         begin_time = time.time()  # inference time start
@@ -105,7 +126,7 @@ class Thread_1(QThread):  # thread 1 : detect single image
         consume_time = round((end_time - begin_time) * 1000, 5)  # en
         # save the results
         of = '/home/mst10512/mmdetection_219/detect_results/' + img.split('/')[-1]
-        ui_result = model.show_result(img, result, score_thr=0.5, show=False, out_file=of, ui_show=True)  # ui_show=True, return [img, ui_result]
+        ui_result = model.show_result(img, result, score_thr=score_thr, show=False, out_file=of, ui_show=True)  # ui_show=True, return [img, ui_result]
         # show the detected image
         imagefile = of
 
@@ -141,10 +162,6 @@ class Thread_2(QThread):
                 bl_config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_1x_voc.py'
                 bl_checkpoint = root_path + 'checkpoints/faster_rcnn/voc/faster_rcnn_r50_fpn_voc.pth'
 
-            if self.dataset == 'DIOR':
-                bl_config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_1x_dior.py'
-                bl_checkpoint = root_path + 'checkpoints/faster_rcnn/dior/faster_rcnn_r50_fpn_dior.pth'
-
 
         if self.baseline_method == 'RetinaNet + FPN':
             if self.dataset == 'COCO':
@@ -154,10 +171,6 @@ class Thread_2(QThread):
             if self.dataset == 'PASCAL VOC':
                 bl_config = root_path + 'configs/retinanet/retinanet_r50_fpn_1x_voc.py'
                 bl_checkpoint = root_path + 'checkpoints/retinanet/voc/retinanet_r50_fpn_voc.pth'
-
-            if self.dataset == 'DIOR':
-                bl_config = root_path + 'configs/retinanet/retinanet_r50_fpn_1x_dior.py'
-                bl_checkpoint = root_path + 'checkpoints/retinanet/dior/retinanet_r50_fpn_dior.pth'
 
 
         if self.new_method == 'Faster R-CNN + CSA-FPN':
@@ -169,10 +182,6 @@ class Thread_2(QThread):
                 new_config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_csa_1x_voc.py'
                 new_checkpoint = root_path + 'checkpoints/faster_rcnn/voc/faster_rcnn_r50_fpn_csa_voc.pth'
 
-            if self.dataset == 'DIOR':
-                new_config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_csa_1x_dior.py'
-                new_checkpoint = root_path + 'checkpoints/faster_rcnn/dior/faster_rcnn_r50_fpn_csa_dior.pth'
-
 
         if self.new_method == 'RetinaNet + CSA-FPN':
             if self.dataset == 'COCO':
@@ -183,9 +192,37 @@ class Thread_2(QThread):
                 new_config = root_path + 'configs/retinanet/retinanet_r50_fpn_csa_1x_voc.py'
                 new_checkpoint = root_path + 'checkpoints/retinanet/voc/retinanet_r50_fpn_csa_voc.pth'
 
-            if self.dataset == 'DIOR':
-                new_config = root_path + 'configs/retinanet/retinanet_r50_fpn_csa_1x_dior.py'
-                new_checkpoint = root_path + 'checkpoints/retinanet/dior/retinanet_r50_fpn_csa_dior.pth'
+
+        if self.new_method == 'Faster R-CNN + AAR-FPN':
+            if self.dataset == 'COCO':
+                new_config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_aar_1x_coco.py'
+                new_checkpoint = root_path + 'checkpoints/faster_rcnn/coco/faster_rcnn_r50_fpn_aar2_coco.pth'
+
+            if self.dataset == 'PASCAL VOC':
+                new_config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_fpn_aar_1x_voc.py'
+                new_checkpoint = root_path + 'checkpoints/faster_rcnn/voc/faster_rcnn_r50_fpn_aar2_voc.pth'
+
+
+
+        if self.new_method == 'RetinaNet + AAR-FPN':
+            if self.dataset == 'COCO':
+                new_config = root_path + 'configs/retinanet/retinanet_r50_fpn_aar_1x_coco.py'
+                new_checkpoint = root_path + 'checkpoints/retinanet/coco/retinanet_r50_fpn_aar2_coco.pth'
+
+            if self.dataset == 'PASCAL VOC':
+                new_config = root_path + 'configs/retinanet/retinanet_r50_fpn_aar_1x_voc.py'
+                new_checkpoint = root_path + 'checkpoints/retinanet/voc/retinanet_r50_fpn_aar2_voc.pth'
+
+
+        if self.new_method == 'Faster R-CNN + CSA-FPN + AAR-FPN':
+            if self.dataset == 'COCO':
+                new_config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_csa_fpn_aar_1x_coco.py'
+                new_checkpoint = root_path + 'checkpoints/faster_rcnn/coco/faster_rcnn_r50_csa_fpn_aar_coco.pth'
+
+            if self.dataset == 'PASCAL VOC':
+                new_config = root_path + 'configs/faster_rcnn/faster_rcnn_r50_csa_fpn_aar_1x_voc.py'
+                new_checkpoint = root_path + 'checkpoints/faster_rcnn/voc/faster_rcnn_r50_csa_fpn_aar_voc.pth'
+
 
         self.detect_dataset_api(bl_config, bl_checkpoint, use_method='baseline')
         self.detect_dataset_api(new_config, new_checkpoint, use_method='new_methods')

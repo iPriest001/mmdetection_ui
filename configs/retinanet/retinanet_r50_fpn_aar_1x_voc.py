@@ -5,22 +5,22 @@ _base_ = [
 # model settings
 model = dict(
     neck=dict(
-        type='FPN_AAR',
+        type='FPN_AAR2',
         in_channels=[256, 512, 1024, 2048],
         out_channels=256,
         start_level=1,
         add_extra_convs='on_output',
         extra_convs_on_inputs=True,  # use P5
         num_outs=5),
-    bbox_head=dict(
-        num_classes=20)) #256
+    bbox_head=dict(num_classes=20))
 
 data = dict(
-    samples_per_gpu=1,
+    samples_per_gpu=2,
     workers_per_gpu=2)
 
 # optimizer
 # optimizer = dict(type='SGD', lr=0.001, momentum=0.9, weight_decay=0.0001)
+
 optimizer = dict(type='AdamW', lr=0.0001, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
 # learning policy
